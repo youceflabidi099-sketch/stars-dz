@@ -379,6 +379,18 @@ select.form-input{cursor:pointer}
 .empty h3{font-size:15px;font-weight:800;margin-bottom:5px;color:var(--text)}
 .empty p{font-size:12.5px}
 
+/* FILTER BUTTONS */
+.filter-btn{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;transition:.2s;border:1px solid var(--border);background:var(--card);color:var(--muted2);white-space:nowrap}
+.filter-btn.active{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(6,182,212,.1));border-color:rgba(59,130,246,.4);color:var(--blue2)}
+.filter-btn:active{transform:scale(.95)}
+
+/* ADMIN ORDER CARD */
+.admin-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:15px 16px;margin-bottom:10px;cursor:pointer;transition:.2s}
+.admin-card:active{transform:scale(.99)}
+.admin-card.s-review{border-right:3px solid var(--gold)}
+.admin-card.s-completed{border-right:3px solid var(--green)}
+.admin-card.s-cancelled{border-right:3px solid var(--red)}
+
 /* DESIGN IMPROVEMENTS */
 .pkg-item{transition:all .25s cubic-bezier(.34,1.56,.64,1)}
 .pkg-item.selected{transform:scale(1.01);box-shadow:0 4px 20px rgba(59,130,246,.15)}
@@ -399,7 +411,7 @@ select.form-input{cursor:pointer}
 <!-- HEADER -->
 <div class="header">
   <div class="h-row1">
-    <div class="logo">
+    <div class="logo" onclick="openAdminPanel()">
       <div class="logo-box">⭐</div>
       <span class="logo-name">Stars DZ</span>
     </div>
@@ -707,6 +719,25 @@ select.form-input{cursor:pointer}
   </div>
 
 </div>
+<!-- ======= ADMIN PAGE ======= -->
+<div id="page-admin" class="page fade-up">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="sec-title" style="margin-bottom:0"><span class="ic">🛡️</span> لوحة الأدمن</div>
+    <div style="font-size:11px;color:var(--muted2);background:var(--card);padding:4px 10px;border-radius:20px;border:1px solid var(--border)">
+      <span id="admin-orders-count">0</span> طلب
+    </div>
+  </div>
+
+  <!-- فلتر الحالة -->
+  <div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:16px;padding-bottom:2px">
+    <div class="filter-btn active" onclick="filterAdminOrders('all',this)">الكل</div>
+    <div class="filter-btn" onclick="filterAdminOrders('review',this)">⏳ مراجعة</div>
+    <div class="filter-btn" onclick="filterAdminOrders('completed',this)">✅ مكتمل</div>
+    <div class="filter-btn" onclick="filterAdminOrders('cancelled',this)">❌ مرفوض</div>
+  </div>
+
+  <div class="orders-list" id="admin-orders-list"></div>
+</div>
 
 </div><!-- /content -->
 
@@ -723,6 +754,29 @@ select.form-input{cursor:pointer}
   </div>
   <div class="nav-item" id="nav-support" onclick="showPage('support')">
     <div class="nav-ico">💬</div><div class="nav-lbl">الدعم</div>
+  </div>
+</div>
+
+<!-- ADMIN PASSWORD MODAL -->
+<div class="modal-overlay" id="admin-pwd-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:40px;margin-bottom:8px">🛡️</div>
+      <div style="font-size:18px;font-weight:900">لوحة الأدمن</div>
+      <div style="font-size:12px;color:var(--muted2);margin-top:4px">أدخل كلمة المرور</div>
+    </div>
+    <input type="password" class="form-input" id="admin-pwd-input" placeholder="كلمة المرور..." style="text-align:center;letter-spacing:4px;font-size:18px;margin-bottom:12px">
+    <button class="submit-btn primary" onclick="checkAdminPwd()">دخول 🔓</button>
+    <button class="submit-btn" style="background:transparent;color:var(--muted2);box-shadow:none;margin-top:6px" onclick="closeAdminPwd()">إلغاء</button>
+  </div>
+</div>
+
+<!-- ORDER ACTION MODAL -->
+<div class="modal-overlay" id="order-action-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="order-action-content"></div>
   </div>
 </div>
 
@@ -755,8 +809,7 @@ select.form-input{cursor:pointer}
 // =========== CONFIG ===========
 const USD_TO_DZD = 280; // سعر الصرف الدج
 const PROFIT_MARGIN = 0.25; // 25% هامش ربح
-const BOT_TOKEN = '7760367578:AAFzAnTw3TeqloL2XgEiSmTkmgbq9aWhp8U';
-const ADMIN_CHAT_ID = '7661265665';
+
 // مستخدم تيليقرام
 let tgUser = null;
 
@@ -1115,6 +1168,7 @@ async function submitOrder() {
     progress: 15,
     date: today,
     time: timeStr,
+    clientId: tgUser?.id?.toString() || null,
   };
   orders.unshift(order);
 
@@ -1195,7 +1249,7 @@ function showPage(p) {
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  document.getElementById('nav-'+p)?.classList.add('active');
+  if (p !== 'admin') document.getElementById('nav-'+p)?.classList.add('active');
   if (p==='orders') renderOrders();
   if (p==='order' && selectedPkg) recalcOrder();
 }
@@ -1205,6 +1259,149 @@ function openTg(url) {
     Telegram.WebApp.openTelegramLink(url);
   } else {
     window.open(url, '_blank');
+  }
+}
+
+// =========== ADMIN PANEL ===========
+const ADMIN_PASSWORD = 'leet1337'; // غيّر كلمة المرور هنا
+let adminFilter = 'all';
+let selectedOrderId = null;
+
+function openAdminPanel() {
+  // فقط الأدمن يمكنه الدخول عبر ID تيليقرام
+  const uid = tgUser?.id?.toString();
+  if (uid === ADMIN_CHAT_ID) {
+    renderAdminOrders();
+    showPage('admin');
+  } else {
+    document.getElementById('admin-pwd-modal').classList.add('show');
+    document.getElementById('admin-pwd-input').value = '';
+    setTimeout(() => document.getElementById('admin-pwd-input').focus(), 400);
+  }
+}
+
+function checkAdminPwd() {
+  const pwd = document.getElementById('admin-pwd-input').value;
+  if (pwd === ADMIN_PASSWORD) {
+    document.getElementById('admin-pwd-modal').classList.remove('show');
+    renderAdminOrders();
+    showPage('admin');
+  } else {
+    showToast('❌ كلمة المرور خاطئة');
+    document.getElementById('admin-pwd-input').value = '';
+  }
+}
+
+function closeAdminPwd() {
+  document.getElementById('admin-pwd-modal').classList.remove('show');
+}
+
+function filterAdminOrders(filter, el) {
+  adminFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderAdminOrders();
+}
+
+function renderAdminOrders() {
+  const filtered = adminFilter === 'all' ? orders : orders.filter(o => o.status === adminFilter);
+  document.getElementById('admin-orders-count').textContent = filtered.length;
+  const statusMap = { pending:'في الانتظار', review:'⏳ مراجعة', processing:'جارٍ', completed:'✅ مكتمل', cancelled:'❌ مرفوض' };
+  const el = document.getElementById('admin-orders-list');
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty"><span class="eico">📭</span><h3>لا توجد طلبات</h3></div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(o => `
+    <div class="admin-card s-${o.status}" onclick="showOrderAction('${o.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;color:var(--muted)">${o.id} • ${o.date} ${o.time||''}</div>
+          <div style="font-size:14px;font-weight:800;margin-top:2px">${o.service}</div>
+        </div>
+        <span class="status-badge s-${o.status}">${statusMap[o.status]}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted2)">
+        <span>🔗 ${o.link||'—'}</span>
+        <span>💵 ${o.totalUsd}$ / ${o.totalDzd} دج</span>
+        <span>💳 ${o.pmLabel||o.pm}</span>
+      </div>
+      ${o.status==='review' ? `
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="event.stopPropagation();approveOrder('${o.id}')" style="flex:1;padding:9px;border-radius:10px;background:linear-gradient(135deg,var(--green),#059669);color:#fff;font-family:'Cairo',sans-serif;font-size:13px;font-weight:800;border:none;cursor:pointer">✅ موافقة</button>
+        <button onclick="event.stopPropagation();rejectOrder('${o.id}')" style="flex:1;padding:9px;border-radius:10px;background:linear-gradient(135deg,var(--red),#dc2626);color:#fff;font-family:'Cairo',sans-serif;font-size:13px;font-weight:800;border:none;cursor:pointer">❌ رفض</button>
+      </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function showOrderAction(id) {
+  selectedOrderId = id;
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  const statusMap = { pending:'⏳ في الانتظار', review:'🔍 قيد المراجعة', processing:'⚙️ جارٍ', completed:'✅ مكتمل', cancelled:'❌ مرفوض' };
+  document.getElementById('order-action-content').innerHTML = `
+    <div style="font-size:17px;font-weight:900;margin-bottom:16px;text-align:center">📋 تفاصيل الطلب</div>
+    <div class="receipt-card">
+      <div class="receipt-row"><span class="rk">رقم الطلب</span><span class="rv">${o.id}</span></div>
+      <div class="receipt-row"><span class="rk">الخدمة</span><span class="rv">${o.service}</span></div>
+      <div class="receipt-row"><span class="rk">الرابط</span><span class="rv" style="direction:ltr;font-size:12px">${o.link}</span></div>
+      <div class="receipt-row"><span class="rk">الدفع</span><span class="rv">${o.pmLabel||o.pm}</span></div>
+      <div class="receipt-row"><span class="rk">المبلغ</span><span class="rv">${o.totalUsd}$ / ${o.totalDzd} دج</span></div>
+      <div class="receipt-row"><span class="rk">التاريخ</span><span class="rv">${o.date} ${o.time||''}</span></div>
+      <div class="receipt-status">${statusMap[o.status]}</div>
+    </div>
+    ${o.status === 'review' ? `
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button onclick="approveOrder('${o.id}')" style="flex:1;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--green),#059669);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:900;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(16,185,129,.35)">✅ موافقة</button>
+      <button onclick="rejectOrder('${o.id}')" style="flex:1;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--red),#dc2626);color:#fff;font-family:'Cairo',sans-serif;font-size:14px;font-weight:900;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(239,68,68,.35)">❌ رفض</button>
+    </div>` : ''}
+    <button class="submit-btn" style="background:rgba(255,255,255,.06);color:var(--muted2);box-shadow:none;margin-top:8px" onclick="document.getElementById('order-action-modal').classList.remove('show')">إغلاق</button>
+  `;
+  document.getElementById('order-action-modal').classList.add('show');
+}
+
+async function approveOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  o.status = 'completed';
+  o.progress = 100;
+  document.getElementById('order-action-modal').classList.remove('show');
+  renderAdminOrders();
+  showToast('✅ تم قبول الطلب');
+
+  // إشعار العميل
+  if (o.clientId && BOT_TOKEN) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        chat_id: o.clientId,
+        text: `✅ تم قبول طلبك وتنفيذه!\n━━━━━━━━━━━━━━━━━\n📦 ${o.service}\n🔖 ${o.id}\n━━━━━━━━━━━━━━━━━\nشكراً لثقتك بـ Stars DZ ⭐`
+      })
+    });
+  }
+}
+
+async function rejectOrder(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  o.status = 'cancelled';
+  o.progress = 0;
+  document.getElementById('order-action-modal').classList.remove('show');
+  renderAdminOrders();
+  showToast('❌ تم رفض الطلب');
+
+  // إشعار العميل
+  if (o.clientId && BOT_TOKEN) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        chat_id: o.clientId,
+        text: `❌ تم رفض طلبك\n━━━━━━━━━━━━━━━━━\n📦 ${o.service}\n🔖 ${o.id}\n━━━━━━━━━━━━━━━━━\n⚠️ السبب: وصل الدفع غير صحيح أو غير واضح\nتواصل معنا @wuldc لأي استفسار`
+      })
+    });
   }
 }
 
