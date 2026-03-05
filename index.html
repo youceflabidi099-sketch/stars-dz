@@ -378,6 +378,18 @@ select.form-input{cursor:pointer}
 .empty .eico{font-size:52px;opacity:.4;margin-bottom:12px;display:block}
 .empty h3{font-size:15px;font-weight:800;margin-bottom:5px;color:var(--text)}
 .empty p{font-size:12.5px}
+
+/* DESIGN IMPROVEMENTS */
+.pkg-item{transition:all .25s cubic-bezier(.34,1.56,.64,1)}
+.pkg-item.selected{transform:scale(1.01);box-shadow:0 4px 20px rgba(59,130,246,.15)}
+.submit-btn{letter-spacing:.3px;position:relative;overflow:hidden}
+.submit-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);pointer-events:none}
+.order-card{transition:all .2s;border-left:3px solid transparent}
+.order-card:hover{border-left-color:var(--blue);transform:translateX(-3px)}
+.hero{position:relative}
+.hero h2{text-shadow:0 2px 20px rgba(246,201,14,.15)}
+.pm-item.selected{box-shadow:0 4px 16px rgba(16,185,129,.1)}
+.status-badge{font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;letter-spacing:.3px}
 </style>
 </head>
 <body>
@@ -393,7 +405,7 @@ select.form-input{cursor:pointer}
     </div>
     <div class="bal-chip" onclick="showPage('support')">
       <span class="live"></span>
-      <span>متصل 🟢</span>
+      <span id="user-chip">متصل 🟢</span>
     </div>
   </div>
   <div class="tabs">
@@ -409,7 +421,7 @@ select.form-input{cursor:pointer}
 
   <div class="hero">
     <div class="hero-pill">🇩🇿 متاح في الجزائر</div>
-    <h2>نجوم وخدمات<br>تيليقرام 🌟</h2>
+    <h2 id="hero-greeting">نجوم وخدمات<br>تيليقرام 🌟</h2>
     <p>دفع بـ CCP وفليكسي • تسليم فوري • ضمان كامل</p>
     <div class="hero-stats">
       <div class="h-stat"><div class="n">+500</div><div class="l">عميل</div></div>
@@ -745,6 +757,9 @@ const USD_TO_DZD = 280; // سعر الصرف الدج
 const PROFIT_MARGIN = 0.25; // 25% هامش ربح
 const BOT_TOKEN = '7760367578:AAFzAnTw3TeqloL2XgEiSmTkmgbq9aWhp8U';
 const ADMIN_CHAT_ID = '7661265665';
+// مستخدم تيليقرام
+let tgUser = null;
+
 // =========== DATA ===========
 const starsPackages = [
   { id:'s50',   stars:50,    usd:0.75,  ton:0.6078,  emoji:'⭐',  popular:false },
@@ -782,6 +797,16 @@ function init() {
   if (window.Telegram?.WebApp) {
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
+
+    // معرفة هوية العميل تلقائياً
+    tgUser = Telegram.WebApp.initDataUnsafe?.user || null;
+    if (tgUser) {
+      const name = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
+      const username = tgUser.username ? `@${tgUser.username}` : '';
+      // تحديث الترحيب
+      document.getElementById('hero-greeting').innerHTML = `أهلاً ${tgUser.first_name} 👋<br>اختر خدمتك 🌟`;
+      document.getElementById('user-chip').textContent = username || name;
+    }
   }
   renderStars();
   renderPremium();
@@ -800,9 +825,8 @@ function renderStars() {
       <div class="pkg-icon" style="margin-top:${p.popular?'10px':'0'}">${p.emoji}</div>
       <div class="pkg-name" style="margin-top:${p.popular?'10px':'0'}">${p.stars.toLocaleString()} نجمة</div>
       <div class="pkg-right" style="margin-top:${p.popular?'10px':'0'}">
-        <div class="pkg-ton">⬦ ${p.ton}</div>
-        <div class="pkg-usd">${finalUsd}$</div>
-        <div class="pkg-dzd">~ ${dzd.toLocaleString()} دج</div>
+        <div class="pkg-usd">${dzd.toLocaleString()} دج</div>
+        <div class="pkg-dzd">~ ${finalUsd}$</div>
       </div>
     </div>`;
   }).join('');
@@ -818,9 +842,8 @@ function renderPremium() {
       <div class="pkg-icon">${p.emoji}</div>
       <div class="pkg-name">${p.label}<span class="pkg-discount">-${p.discount}%</span></div>
       <div class="pkg-right">
-        <div class="pkg-ton">⬦ ${p.ton}</div>
-        <div class="pkg-usd">${finalUsd}$</div>
-        <div class="pkg-dzd">~ ${dzd.toLocaleString()} دج</div>
+        <div class="pkg-usd">${dzd.toLocaleString()} دج</div>
+        <div class="pkg-dzd">~ ${finalUsd}$</div>
       </div>
     </div>`;
   }).join('');
@@ -994,8 +1017,17 @@ function copyText(txt) {
 // =========== SEND TO TELEGRAM ===========
 async function sendToTelegram(order, file) {
   try {
+    // معلومات العميل
+    const clientName = tgUser ? (tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '')) : 'غير معروف';
+    const clientUsername = tgUser?.username ? `@${tgUser.username}` : '—';
+    const clientId = tgUser?.id || '—';
+
     const msg =
 `🆕 طلب جديد ${order.id}
+━━━━━━━━━━━━━━━━━
+👤 العميل: ${clientName}
+🔖 يوزرنيم: ${clientUsername}
+🆔 ID: ${clientId}
 ━━━━━━━━━━━━━━━━━
 📦 الخدمة: ${order.service}
 🔗 الرابط: ${order.link}
@@ -1005,21 +1037,52 @@ async function sendToTelegram(order, file) {
 ━━━━━━━━━━━━━━━━━
 ⏳ الحالة: قيد المراجعة`;
 
+    // إرسال الرسالة مع أزرار الموافقة والرفض
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ chat_id: ADMIN_CHAT_ID, text: msg })
+      body: JSON.stringify({
+        chat_id: ADMIN_CHAT_ID,
+        text: msg,
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '✅ موافقة — تم التنفيذ', callback_data: `approve_${order.id}_${clientId}` },
+            { text: '❌ رفض — وصل خاطئ', callback_data: `reject_${order.id}_${clientId}` }
+          ]]
+        }
+      })
     });
 
     if (file) {
       const form = new FormData();
       form.append('chat_id', ADMIN_CHAT_ID);
       form.append('photo', file);
-      form.append('caption', `📎 وصل الطلب ${order.id}`);
+      form.append('caption', `📎 وصل الطلب ${order.id} — ${clientName} ${clientUsername}`);
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
         method: 'POST', body: form
       });
     }
+
+    // إشعار العميل بأن طلبه وصل
+    if (clientId && clientId !== '—') {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          chat_id: clientId,
+          text:
+`✅ وصل طلبك بنجاح!
+━━━━━━━━━━━━━━━━━
+📦 ${order.service}
+💵 ${order.totalUsd}$ / ${order.totalDzd} دج
+🔖 رقم الطلب: ${order.id}
+━━━━━━━━━━━━━━━━━
+⏳ جارٍ مراجعة وصل الدفع...
+سنُخطرك فور الموافقة أو الرفض 🔔`
+        })
+      });
+    }
+
   } catch(e) { console.error(e); }
 }
 
@@ -1036,8 +1099,9 @@ async function submitOrder() {
   document.getElementById('submit-btn').disabled = true;
 
   const orderId = '#ORD-' + (++orderIdCounter);
-  const today = new Date().toISOString().split('T')[0];
-  const timeStr = new Date().toLocaleTimeString('ar-DZ', {hour:'2-digit',minute:'2-digit'});
+  const now = new Date();
+  const today = now.toLocaleDateString('ar-DZ', { timeZone: 'Africa/Algiers', year:'numeric', month:'2-digit', day:'2-digit' });
+  const timeStr = now.toLocaleTimeString('ar-DZ', { timeZone: 'Africa/Algiers', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
   const order = {
     id: orderId,
